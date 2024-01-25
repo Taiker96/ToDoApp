@@ -1,7 +1,7 @@
 import PropTypes from "prop-types";
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, localize } from '../constants';
-import { modalProps } from '../types';
+import { ModalPropType } from '../types';
 
 const styles = StyleSheet.create({
     centeredView: {
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     }
 });
 
-export default function App(props: modalProps) {
+export default function App(props: ModalPropType) {
     const { title, type, open, onAction } = props;
 
     const btnAction = (status: boolean = false) => {

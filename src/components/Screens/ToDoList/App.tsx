@@ -12,7 +12,7 @@ import {
 import { RequiredText, YesNoModal } from "../../common";
 import Config from "../../config";
 import { colors, localize } from "../../constants";
-import { PickerMode, todoListType, DateType } from "../../types";
+import { PickerModeType, TodoListType, DateType } from "../../types";
 import ToDoList from "./ToDoList";
 
 const styles = StyleSheet.create({
@@ -75,20 +75,39 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     backgroundColor: colors?.info,
+  },
+  titleView: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    position: 'relative'
   }
 });
 
-const defaultMode = 'view';
-const defaultInfo = {
-  text: "",
-  dateTime: null,
-};
-const textWhite = { style: { color: colors?.white } };
-
+//<==========================TYPE INTERFACE================================>
 type ModeType = 'add' | 'edit' | 'view';
-interface ErrorState {
+type TodoListTypeExcpectID = Omit<TodoListType, 'id'>;
+
+interface ErrorType {
   [key: string]: boolean
 };
+interface ModalInfoType {
+  title: string;
+  type: string;
+  mode?: string;
+};
+
+//<==========================DEFAULT================================>
+const defaultMode = 'view';
+const defaultInfo = {
+  text: '',
+  dateTime: null
+};
+const defaultModalInfo = {
+  title: '',
+  type: 'YES_NO',
+  mode: ''
+};
+const textWhite = { style: { color: colors?.white } };
 
 const dateTimeList = new Map([
   ['date', { format: 'YYYY-MM-DD' }],
@@ -96,19 +115,41 @@ const dateTimeList = new Map([
 ]);
 
 export default function App() {
-  const [todoList, setTodoList] = useState<Array<todoListType> | []>([]);
-  const [openDelModal, setOpenDelModal] = useState<boolean>(false);
+  const [todoList, setTodoList] = useState<Array<TodoListType> | []>([]);
+  const [openModal, setOpenModal] = useState<boolean>(false);
   const [openDatePicker, setOpenDatePicker] = useState<boolean>(false);
   const [mode, setMode] = useState<ModeType>(defaultMode);
-  const [error, setError] = useState<ErrorState>({});
-  const [dataMaster, setDataMaster] = useState<todoListType>(defaultInfo);
+  const [error, setError] = useState<ErrorType>({});
+  const [dataMaster, setDataMaster] = useState<TodoListType>(defaultInfo);
   const indexKey = useRef<number>(0);
-  const dateMode = useRef<PickerMode>("date");
-  const itemInfo = useRef<todoListType>({});
-  const infoDel = useRef<todoListType>({});
+  const modalInfo = useRef<ModalInfoType>(defaultModalInfo);
+  const dateMode = useRef<PickerModeType>("date");
+  const itemInfo = useRef<TodoListType>({});
+  const infoDel = useRef<TodoListType>({});
   const disabled = mode === "view";
 
+  const getModalInfoByMode = useCallback((key = mode) => {
+    let objInfo = defaultModalInfo;
+    switch (key) {
+      case 'add':
+        objInfo = { ...objInfo, title: localize.onSave, mode: 'add' };
+        break;
+      case 'edit':
+        objInfo = { ...objInfo, title: localize.del, mode: 'del' };
+        break;
+      default:
+        break;
+    }
+    return objInfo;
+  }, []);
+
+  const _setOpenModal = (status: boolean, key: ModeType) => {
+    modalInfo.current = status ? getModalInfoByMode(key) : defaultModalInfo;
+    setOpenModal(status);
+  };
+
   const onSent = () => {
+    if (disabled) return;
     const errArr = [];
     for (const [key, value] of Object.entries(dataMaster)) {
       if (Config.isEmpty(value)) errArr.push(key);
@@ -121,14 +162,17 @@ export default function App() {
 
     let data = [...todoList];
     if (!Config.isEmpty(itemInfo.current)) {  // EDIT
+      // console.log("EDIT");
       data[itemInfo.current.id!] = { ...data[itemInfo.current.id!], ...dataMaster };
     } else {  // ADD
+      // console.log("ADD");
       data = [...data, {
         id: indexKey.current++,
         ...dataMaster
       }];
     }
     setTodoList(data);
+    setMode(defaultMode); // ADD EDIT DONE thì cho về VIEW
     onResetForm();
   };
 
@@ -136,10 +180,11 @@ export default function App() {
     itemInfo.current = {};
     setMode(modeName);
     setError({});
+    setOpenModal(false);
     setDataMaster(defaultInfo);
   };
 
-  const onEdit = (data: todoListType) => {
+  const onEdit = (data: TodoListType) => {
     if (Config.isEmpty(data?.id)) return;
     itemInfo.current = data;
     setMode('edit');
@@ -147,15 +192,17 @@ export default function App() {
   };
 
   const onAdd = () => {
-    onResetForm('add');
+    const isChangeMaster = Object.keys(defaultInfo).some(name => dataMaster?.[name as keyof TodoListType] !== defaultInfo?.[name as keyof TodoListTypeExcpectID]);
+    if ((mode === 'edit' || isChangeMaster) && !openModal) _setOpenModal(true, 'add');
+    else onResetForm('add');
   };
 
-  const onOpenModal = (data = {}) => {
+  const onDel = (data = {}) => {
     infoDel.current = data;
-    setOpenDelModal(true);
+    _setOpenModal(true, 'edit');
   };
 
-  const onDel = (isYes = false) => {
+  const handleDel = (isYes = false) => {
     if (isYes) {
       const { id } = infoDel.current;
       if (Config.isEmpty(id)) return;
@@ -171,7 +218,7 @@ export default function App() {
     } else {
       infoDel.current = {};
     }
-    setOpenDelModal(false);
+    _setOpenModal(false, 'edit');
   };
 
   const onChange = (key: string, e: any) => {
@@ -189,7 +236,7 @@ export default function App() {
     });
   };
 
-  const dateTimeValue = useCallback((name: PickerMode) => {
+  const dateTimeValue = useCallback((name: PickerModeType): string => {
     let formatType = "";
     switch (name) {
       case 'date':
@@ -205,26 +252,38 @@ export default function App() {
     return result;
   }, [dataMaster.dateTime]);
 
-
-  const onChangeDateTime = (name: PickerMode): void => {
+  const onChangeDateTime = (name: PickerModeType): void => {
+    if (disabled) return;
     dateMode.current = name;
     setOpenDatePicker(true);
   };
 
+  const modalAction = (status: boolean) => {
+    switch (mode) {
+      case 'edit': // Trường Hợp đang Edit Bấm Thêm Ngược lại là xóa
+        modalInfo.current.mode === 'add' ? onSent() : handleDel(status);
+        break;
+      case 'add':
+        status ? onSent() : onResetForm();
+        break;
+      default:
+        break;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       {/* <ImageBackground source={{ uri: 'https://taiker96.netlify.app/assets/images/bg.jpg' }} resizeMode={"cover"} style={styles.image} ></ImageBackground> */}
-      <View style={{ flexDirection: 'row', justifyContent: 'center', position: 'relative' }}>
+      <View style={styles.titleView}>
         <Text style={styles.title}>TodoList</Text>
         <TouchableOpacity style={styles.btnAdd} onPress={onAdd}><Text {...textWhite}>{localize.add}</Text></TouchableOpacity>
       </View>
-      <ToDoList data={todoList} onEdit={onEdit} onDel={(e) => onOpenModal(e)} />
+      <ToDoList data={todoList} onEdit={onEdit} onDel={(e) => onDel(e)} />
       <YesNoModal
-        open={openDelModal}
-        type={"YES_NO"}
-        title={localize.del}
-        onAction={(isYes) => onDel(isYes)}
+        open={openModal}
+        type={modalInfo.current.type}
+        title={modalInfo.current.title}
+        onAction={(isYes) => modalAction(isYes)}
       />
       <View style={styles.AddArea}>
         <View style={{ ...styles.spacingBottom, flexDirection: 'row' }}>
@@ -254,6 +313,7 @@ export default function App() {
         </View>
         <View style={{ position: 'relative', flex: 1 }}>
           <TextInput
+            readOnly={disabled}
             style={styles.todoText}
             onChangeText={(e: any) => onChange('text', e)}
             value={dataMaster?.text}

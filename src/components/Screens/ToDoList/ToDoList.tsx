@@ -1,7 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { colors } from '../../constants';
-import { todoListType } from "../../types";
+import { TodoListType } from "../../types";
 import moment from 'moment';
 
 const items = {
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
 });
 
 interface listProps {
-  data: todoListType[];
+  data: TodoListType[];
   onEdit: (item: object) => void;
   onDel: (item: object) => void;
 }
@@ -58,7 +58,7 @@ export default function App(props: listProps) {
   const { data, onEdit, onDel } = props;
 
   const renderList = () => {
-    const result = data && data.map((item: todoListType) => {
+    const result = data && data.map((item: TodoListType) => {
       const { id, text, dateTime } = item;
       return <View key={id} style={styles.taskItem}>
         <View style={styles.inputID}><Text>{id}</Text></View>
